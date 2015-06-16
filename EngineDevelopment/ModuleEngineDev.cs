@@ -10,8 +10,8 @@ namespace EngineDevelopment
         public List<ConfigNode> nozzleAlts;
         public List<ConfigNode> cycleAlts;
         #region Fields
-        [KSPField]
-        public double chamberNominalTemp = 0d;
+        //[KSPField]
+        //public double chamberNominalTemp = 0d;
 
 
         protected bool instantThrottle = false;

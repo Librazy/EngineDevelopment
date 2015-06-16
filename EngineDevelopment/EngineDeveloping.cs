@@ -6,9 +6,17 @@ namespace EngineDevelopment
 {
     public class EngineDeveloping:EngineSolver
     {
-        protected double Isp_tc;
-        protected FloatCurve atmosphereCurve = null, atmCurve = null, velCurve = null;
-        protected double runningTime;
+        protected bool combusting = true;
 
+        protected double Isp_tc;//Not considering ullages
+        protected FloatCurve Isptc_APressureCurve = null;
+        protected double runningTime;
+        protected double dynamicReliability;
+
+        //Chamber
+        protected double chamberPressure, chamberTemp;
+
+        //Nozzle
+        protected double nozzle_ePressure, nozzleTemp;
     }
 }
