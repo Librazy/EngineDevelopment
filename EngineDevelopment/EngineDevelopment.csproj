@@ -14,12 +14,15 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
+    <DebugType>pdbonly</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>E:\Games\KSPDev1.0.2\GameData\EngineDevelopment\plugins\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <DocumentationFile>
+    </DocumentationFile>
+    <GenerateSerializationAssemblies>On</GenerateSerializationAssemblies>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -32,12 +35,15 @@
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
       <HintPath>E:\Games\KSPDev1.0.2\KSP_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="KSPAPIExtensions">
       <HintPath>E:\Games\KSPDev1.0.2\GameData\RealFuels\Plugins\KSPAPIExtensions.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="SolverEngines">
       <HintPath>E:\Games\KSPDev1.0.2\GameData\SolverEngines\Plugins\SolverEngines.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -47,12 +53,17 @@
     <Reference Include="System.Xml" />
     <Reference Include="UnityEngine">
       <HintPath>E:\Games\KSPDev1.0.2\KSP_Data\Managed\UnityEngine.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ModuleEngineDev.cs" />
     <Compile Include="EngineDeveloping.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Physics.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="LICENSE-EI.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
