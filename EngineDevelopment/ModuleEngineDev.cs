@@ -9,10 +9,7 @@ namespace EngineDevelopment
 {
     class ModuleEngineDev : ModuleEnginesSolver, IPartCostModifier, IPartMassModifier
     {
-        public List<ConfigNode> nozzleAlts;
-        public List<ConfigNode> cycleAlts;
-        public List<ConfigNode> chamberAlts;
-        //#region Fields
+        #region Fields
         [KSPField(isPersistant = true, guiActive = false)]
         public int maxBurnTime = 0;
         [KSPField(isPersistant = true, guiActive = false)]
@@ -20,12 +17,11 @@ namespace EngineDevelopment
         [KSPField(isPersistant = true, guiActive = true)]
         public int ignitionsAvailable = 0;
         [KSPField(isPersistant = false, guiActive = false)]
-        public int jerkResistance = 0;
+        public int jerkTolerance = 0;
 
-        protected bool instantThrottle = false;
-        protected float throttleResponseRate;
-        protected EngineDeveloping engDevSolver = null;
-        //#endregion
+        #endregion
+
+        #region RF adapter
         private int vParts = -1;
         private static Type rfModule, rfTank;
         private static FieldInfo RFname, RFloss_rate, RFtemperature, RFfuelList, RFpressurizedFuels;
@@ -109,7 +105,6 @@ namespace EngineDevelopment
                 vParts = curParts;
             }
         }
-
         private bool RFIsPressurized(PartResource pr)
         {
             Debug.Log("RFIsPressurized");
@@ -154,9 +149,25 @@ namespace EngineDevelopment
             return minFuelRatio;
 
         }
+        #endregion
+
+        public List<ConfigNode> nozzleAlts;
+        public List<ConfigNode> cycleAlts;
+        public List<ConfigNode> chamberAlts;
         private ConfigNode cycleDefault = null;
         private ConfigNode nozzleDefault = null;
         private ConfigNode chamberDefault = null;
+        private float massMult = 1;
+        private float costMult = 1;
+
+        private float Isp_vac_o = -1;
+        private float Isp_atm_o = -1;
+        private float FF_o = -1;
+        private float V_e_o = -1;
+
+
+        private float Pe_d = -1, Ae_d = -1, maxFuelFlow_d = -1, minFuelFlow_d = -1, Tcns_d = -1, Pcns_d = -1, C_per_sqrt_t_d = -1;
+
         public override void OnLoad(ConfigNode node)
         {
             Debug.Log("OnLoad:start");
@@ -169,7 +180,7 @@ namespace EngineDevelopment
                 subNode.CopyTo(newNode);
                 nozzleAlts.Add(newNode);
                 if (newNode.GetValue("isDefault") == "1") subNode.CopyTo(nozzleDefault);
-                Debug.Log("OnLoad:Nozzle" + newNode.GetValue("name"));
+                Debug.Log("OnLoad:Nozzle:" + newNode.GetValue("name"));
             }
             foreach (ConfigNode subNode in node.GetNodes("POWERCYCLEALT"))
             {
@@ -177,7 +188,7 @@ namespace EngineDevelopment
                 subNode.CopyTo(newNode);
                 cycleAlts.Add(newNode);
                 if (newNode.GetValue("isDefault") == "1") subNode.CopyTo(cycleDefault);
-                Debug.Log("OnLoad:PC" + newNode.GetValue("name"));
+                Debug.Log("OnLoad:PC:" + newNode.GetValue("name"));
             }
             foreach (ConfigNode subNode in node.GetNodes("CHAMBERALT"))
             {
@@ -185,22 +196,52 @@ namespace EngineDevelopment
                 subNode.CopyTo(newNode);
                 chamberAlts.Add(newNode);
                 if (newNode.GetValue("isDefault") == "1") subNode.CopyTo(chamberDefault);
-                Debug.Log("OnLoad:Chamber" + newNode.GetValue("name"));
+                Debug.Log("OnLoad:Chamber:" + newNode.GetValue("name"));
             }
-            float outMaxFF, outMinFF;
-            if (float.TryParse(cycleDefault.GetValue("maxMassFlow"), out outMaxFF))maxFuelFlow = outMaxFF;
-            if (float.TryParse(cycleDefault.GetValue("minMassFlow"), out outMinFF))minFuelFlow = outMinFF;
 
-            
-            maxEngineTemp = 10000;
+            //Get the defaults first
+            float outMaxFF, outMinFF;
+            if (float.TryParse(cycleDefault.GetValue("maxMassFlow"), out outMaxFF)) maxFuelFlow_d = outMaxFF;
+            if (float.TryParse(cycleDefault.GetValue("minMassFlow"), out outMinFF)) minFuelFlow_d = outMinFF;
+            float outPe, outAe;
+            if (float.TryParse(nozzleDefault.GetValue("exitPressure"), out outPe)) Pe_d = outPe;
+            if (float.TryParse(nozzleDefault.GetValue("exitArea"), out outAe)) Ae_d = outAe;
+            float outPcns, outTcns;
+            if (float.TryParse(chamberDefault.GetValue("chamberPressure"), out outPcns)) Pe_d = outPcns;
+            if (float.TryParse(chamberDefault.GetValue("chamberTemperature"), out outTcns)) Ae_d = outTcns;
+
+
+            //Start to think about performance calc:
+            //Units:V-m/s    T-k    P-kPa   Isp-s   FF-ton/s
+            //calc the raw data (_o)
+            Isp_vac_o = atmosphereCurve.Evaluate(0);
+            Isp_atm_o = atmosphereCurve.Evaluate(1);
+            FF_o = (maxThrust) / (Isp_vac_o * 9.80665f);
+            V_e_o = Isp_vac_o * 9.80665f;
+            //We have Pe and Pc_ns,so we can calc ε (1.20),but Where is Gamma? 
+            //The 
+            //Cstar ∝ sqrt(Tc_ns)  (1.32a)
+            //Ct==COST + ε(Pe-Pa)/Pc_ns
+            //C==Cstar*Ct?
+            //C==Ve+Ae(Pe-Pa)(g/FF)?  (1-8)
+            //Isp=C/9.80665f
+            //
+            //Let defaults fit the raw data
+            //
+            float detC = (Isp_vac_o - Isp_atm_o) * 9.80665f;
+            //detC==Cstar*(Ct_vac-Ct_atm)==Cstar*(ε(Pe)/Pc_ns-ε(Pe-Pa)/Pc_ns)==Cstar*ε*Pa/Pc_ns
+            //It seems that we can use [Cstar*ε/sqrt(Tc_ns)] as a cost,so Gamma is included
+            C_per_sqrt_t_d = detC * Pcns_d / (Mathf.Sqrt(Tcns_d) * 101.3125f);
+
+
+            useAtmCurve = useAtmCurve = false;
             Debug.Log("OnLoad:end");
         }
         #region Overrides
         public override void CreateEngine()
         {
             Debug.Log("CreateEngine:start");
-            engDevSolver = new EngineDeveloping();
-            engineSolver = engDevSolver;
+            engineSolver = new EngineDeveloping();
             Debug.Log("CreateEngine:end");
         }
         public override void OnAwake()
@@ -211,21 +252,18 @@ namespace EngineDevelopment
             cycleAlts = new List<ConfigNode>();
             chamberAlts = new List<ConfigNode>();
             vesselTanks = new Dictionary<Part, Dictionary<string, RFTank>>();
+            nozzleDefault = new ConfigNode("NOZZLEALT");
+            cycleDefault = new ConfigNode("POWERCYCLEALT");
+            chamberDefault = new ConfigNode("CHAMBERALT");
             Debug.Log("OnAwake:end");
-        }
-        public override void OnStart(StartState state)
-        {
-            Debug.Log("OnStart:start");
-            base.OnStart(state);
-            Debug.Log("OnStart:end");
         }
         public override void UpdateFlightCondition(EngineThermodynamics ambientTherm, double altitude, Vector3d vel, double mach, bool oxygen)
         {
             Debug.Log("UpdateFlightCondition:start");
             Debug.Log("UpdateFlightCondition:" + ambientTherm + "-" + altitude + "-" + vel + "-" + mach + "-" + oxygen);
-            Debug.Log("UpdateFlightCondition:Engine :T" + engDevSolver.GetEngineTemp() + ",Isp:" + engDevSolver.GetIsp() + ",S:" + engDevSolver.GetStatus() + ",R:" + engDevSolver.GetRunning());
+            Debug.Log("UpdateFlightCondition:Engine :T" + engineSolver.GetEngineTemp() + ",Isp:" + engineSolver.GetIsp() + ",S:" + engineSolver.GetStatus() + ",R:" + engineSolver.GetRunning());
             base.UpdateFlightCondition(ambientTherm, altitude, vel, mach, oxygen);
-            engDevSolver.CalculatePhysics(vessel, part, TimeWarp.fixedDeltaTime, RFFuelRatio());
+            (engineSolver as EngineDeveloping).CalculatePhysics(vessel, part, TimeWarp.fixedDeltaTime, RFFuelRatio());
 
 
             Debug.Log("UpdateFlightCondition:end");
@@ -233,17 +271,10 @@ namespace EngineDevelopment
         #endregion
 
         #region Info
-        protected string ThrottleString()
-        {
-            string output = "";
-
-            return output;
-        }
         protected string GetThrustInfo()
         {
             Debug.Log("GetThrustInfo:start");
             string output = "";
-            if (engDevSolver != null) output = engDevSolver.physicsSimulator.GetJerkDamage().ToString();
             Debug.Log("GetThrustInfo:end");
             return output;
         }
@@ -254,9 +285,8 @@ namespace EngineDevelopment
         }
         public override string GetPrimaryField()
         {
-            return GetThrustInfo();
+            return "";
         }
-
         public override string GetInfo()
         {
             string output = GetThrustInfo();
@@ -268,12 +298,12 @@ namespace EngineDevelopment
 
         public float GetModuleCost(float defaultCost)
         {
-            return defaultCost;
+            return defaultCost * costMult;
         }
 
         public float GetModuleMass(float defaultMass)
         {
-            return defaultMass;
+            return defaultMass * massMult;
         }
     }
 

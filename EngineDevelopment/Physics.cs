@@ -37,7 +37,6 @@ namespace EngineDevelopment
         private Queue<float> jerkAccum = new Queue<float>();
         float jerkAccumAmount = 0;
         float maxJerkAccumAmount = 0;
-
         public string FuelFlowState
         {
             get
@@ -50,6 +49,8 @@ namespace EngineDevelopment
                 fuelFlowState = value;
             }
         }
+
+
         public void Reset()
 		{
 			ullageHeightMin = 0.05f; ullageHeightMax = 0.95f;
@@ -94,8 +95,6 @@ namespace EngineDevelopment
 
 			Debug.Log("Ullage: dt: " + deltaTime.ToString("F2") + " localAcc: " + localAcceleration.ToString() + " rotateRate: " + rotation.ToString());
 			
-			// Natural diffusion.
-			Debug.Log("Ullage: LocalAcc: " + localAcceleration.ToString());
 
 			// Translate forward/backward.
 			ullageHeightMin = Mathf.Clamp(ullageHeightMin + localAccelerationAmount.y * s_TranslateAxialCoefficientY * fuelRatioFactor, 0.0f, 0.9f);
