@@ -18,6 +18,14 @@ namespace EngineDevelopment
         public int ignitionsAvailable = 0;
         [KSPField(isPersistant = false, guiActive = false)]
         public int jerkTolerance = 0;
+        [KSPField(isPersistant = false, guiActive = false)]
+        public int multiChamber = 0;
+        [KSPField(isPersistant = true, guiActive = false)]
+        public int chamber = 0;
+        [KSPField(isPersistant = true, guiActive = false)]
+        public int nozzle = 0;
+        [KSPField(isPersistant = true, guiActive = false)]
+        public int powerCycle = 0;
 
         #endregion
 
@@ -157,6 +165,9 @@ namespace EngineDevelopment
         private ConfigNode cycleDefault = null;
         private ConfigNode nozzleDefault = null;
         private ConfigNode chamberDefault = null;
+        private ConfigNode cycleChoice = null;
+        private ConfigNode nozzleChoice = null;
+        private ConfigNode chamberChoice = null;
         private float massMult = 1;
         private float costMult = 1;
 
@@ -164,9 +175,10 @@ namespace EngineDevelopment
         private float Isp_atm_o = -1;
         private float FF_o = -1;
         private float V_e_o = -1;
-
-
-        private float Pe_d = -1, Ae_d = -1, maxFuelFlow_d = -1, minFuelFlow_d = -1, Tcns_d = -1, Pcns_d = -1, C_per_sqrt_t_d = -1;
+        private float detC_o = -1;
+        private float Cscost_d = -1;
+        private float Pe_d = -1, Ae_d = -1, maxFuelFlow_d = -1, minFuelFlow_d = -1, Tcns_d = -1, Pcns_d = -1, Cse_per_sqrt_t_d = -1;
+        private float Pe_c = -1, Ae_c = -1, maxFuelFlow_c = -1, minFuelFlow_c = -1, Tcns_c = -1, Pcns_c = -1, C_per_sqrt_t_c = -1;
 
         public override void OnLoad(ConfigNode node)
         {
@@ -180,6 +192,7 @@ namespace EngineDevelopment
                 subNode.CopyTo(newNode);
                 nozzleAlts.Add(newNode);
                 if (newNode.GetValue("isDefault") == "1") subNode.CopyTo(nozzleDefault);
+                /*TEMPORARY*/if (newNode.GetValue("type") == nozzle.ToString()) subNode.CopyTo(nozzleChoice);
                 Debug.Log("OnLoad:Nozzle:" + newNode.GetValue("name"));
             }
             foreach (ConfigNode subNode in node.GetNodes("POWERCYCLEALT"))
@@ -188,6 +201,7 @@ namespace EngineDevelopment
                 subNode.CopyTo(newNode);
                 cycleAlts.Add(newNode);
                 if (newNode.GetValue("isDefault") == "1") subNode.CopyTo(cycleDefault);
+                /*TEMPORARY*/if (newNode.GetValue("type") == powerCycle.ToString()) subNode.CopyTo(cycleChoice);
                 Debug.Log("OnLoad:PC:" + newNode.GetValue("name"));
             }
             foreach (ConfigNode subNode in node.GetNodes("CHAMBERALT"))
@@ -196,6 +210,7 @@ namespace EngineDevelopment
                 subNode.CopyTo(newNode);
                 chamberAlts.Add(newNode);
                 if (newNode.GetValue("isDefault") == "1") subNode.CopyTo(chamberDefault);
+                /*TEMPORARY*/if (newNode.GetValue("type") == chamber.ToString()) subNode.CopyTo(chamberChoice);
                 Debug.Log("OnLoad:Chamber:" + newNode.GetValue("name"));
             }
 
@@ -210,7 +225,6 @@ namespace EngineDevelopment
             if (float.TryParse(chamberDefault.GetValue("chamberPressure"), out outPcns)) Pe_d = outPcns;
             if (float.TryParse(chamberDefault.GetValue("chamberTemperature"), out outTcns)) Ae_d = outTcns;
 
-
             //Start to think about performance calc:
             //Units:V-m/s    T-k    P-kPa   Isp-s   FF-ton/s
             //calc the raw data (_o)
@@ -219,22 +233,34 @@ namespace EngineDevelopment
             FF_o = (maxThrust) / (Isp_vac_o * 9.80665f);
             V_e_o = Isp_vac_o * 9.80665f;
             //We have Pe and Pc_ns,so we can calc ε (1.20),but Where is Gamma? 
-            //The 
+            //
             //Cstar ∝ sqrt(Tc_ns)  (1.32a)
             //Ct==COST + ε(Pe-Pa)/Pc_ns
             //C==Cstar*Ct?
             //C==Ve+Ae(Pe-Pa)(g/FF)?  (1-8)
             //Isp=C/9.80665f
+            //C==Cstar*（COST+ε(Pe-Pa)/Pc_ns）==Cstar*（COST+εPe/Pc_ns-εPa/Pc_ns）=Cstar*COST+Cstar*ε(Pe-Pa)/Pc_ns
+            //Let defaults fit the raw data(_d)
             //
-            //Let defaults fit the raw data
-            //
-            float detC = (Isp_vac_o - Isp_atm_o) * 9.80665f;
+            detC_o = (Isp_vac_o - Isp_atm_o) * 9.80665f;
             //detC==Cstar*(Ct_vac-Ct_atm)==Cstar*(ε(Pe)/Pc_ns-ε(Pe-Pa)/Pc_ns)==Cstar*ε*Pa/Pc_ns
             //It seems that we can use [Cstar*ε/sqrt(Tc_ns)] as a cost,so Gamma is included
-            C_per_sqrt_t_d = detC * Pcns_d / (Mathf.Sqrt(Tcns_d) * 101.3125f);
+            Cse_per_sqrt_t_d = detC_o * Pcns_d / (Mathf.Sqrt(Tcns_d) * 101.3125f);
+            Cscost_d = Cse_per_sqrt_t_d * Mathf.Sqrt(Tcns_d)*(Pe_d- 101.3125f) / Pcns_d;
 
 
-            useAtmCurve = useAtmCurve = false;
+            //TEMPORARY：Load and calculate the choices
+            try {
+                if (float.TryParse(cycleChoice.GetValue("maxMassFlow"), out outMaxFF)) maxFuelFlow_c = outMaxFF;
+                if (float.TryParse(cycleChoice.GetValue("minMassFlow"), out outMinFF)) minFuelFlow_c = outMinFF;
+                if (float.TryParse(nozzleChoice.GetValue("exitPressure"), out outPe)) Pe_c = outPe;
+                if (float.TryParse(nozzleChoice.GetValue("exitArea"), out outAe)) Ae_c = outAe;
+                if (float.TryParse(chamberChoice.GetValue("chamberPressure"), out outPcns)) Pcns_c = outPcns;
+                if (float.TryParse(chamberChoice.GetValue("chamberTemperature"), out outTcns)) Tcns_c = outTcns;
+            }
+            catch (Exception e) { Debug.Log(e); }
+
+
             Debug.Log("OnLoad:end");
         }
         #region Overrides
@@ -242,6 +268,16 @@ namespace EngineDevelopment
         {
             Debug.Log("CreateEngine:start");
             engineSolver = new EngineDeveloping();
+            (engineSolver as EngineDeveloping).InitializeOverallEngineData(
+                Cse_per_sqrt_t_d,
+                Cscost_d,Pcns_d,
+                Tcns_d,
+                Pe_c,
+                Ae_c,
+                maxFuelFlow_c,
+                minFuelFlow_c
+                );
+            useAtmCurve = useAtmCurve = false;
             Debug.Log("CreateEngine:end");
         }
         public override void OnAwake()
@@ -255,6 +291,9 @@ namespace EngineDevelopment
             nozzleDefault = new ConfigNode("NOZZLEALT");
             cycleDefault = new ConfigNode("POWERCYCLEALT");
             chamberDefault = new ConfigNode("CHAMBERALT");
+            /*TEMPORARY*/nozzleChoice = new ConfigNode("NOZZLEALT");
+            /*TEMPORARY*/cycleChoice = new ConfigNode("POWERCYCLEALT");
+            /*TEMPORARY*/chamberChoice = new ConfigNode("CHAMBERALT");
             Debug.Log("OnAwake:end");
         }
         public override void UpdateFlightCondition(EngineThermodynamics ambientTherm, double altitude, Vector3d vel, double mach, bool oxygen)

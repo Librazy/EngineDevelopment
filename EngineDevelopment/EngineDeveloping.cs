@@ -20,12 +20,13 @@ namespace EngineDevelopment
         protected FloatCurve Isptc_APressureCurve = null;
         protected double runningTime;
         protected double dynamicReliability;
-        protected double shockResistance;
+        protected double jerkTolerance;
         protected short multiChamber;
         public PhysicsSimulator physicsSimulator = new PhysicsSimulator();
 
 
-
+        protected float Cse_per_sqrt_t;
+        protected float Cscost;
         //Chamber
         /// <summary>
         /// Pc_ns;
@@ -45,7 +46,7 @@ namespace EngineDevelopment
         /// At
         /// Flow area at throat;
         /// </summary>
-        protected double nozzle_tArea/*Pe*/;
+        protected double nozzle_tArea/*Ae*/;
         /// <summary>
         /// Pe
         /// Flow static pressures at exit;
@@ -68,26 +69,50 @@ namespace EngineDevelopment
         /// </summary>
         protected double cycleMaxMassFlow;
         /// <summary>
-        /// Maximum pressure can output
+        /// Maximum mass flow can load
         /// </summary>
-        protected double cyclePressureAllowed;
+        protected double cycleMinMassFlow;
         /// <summary>
         /// Fuel Efficienty
         /// </summary>
         protected double cycleFuelEfficiency;
 
-        internal void CalculatePhysics(Vessel vessel,Part engine,float deltaTime,float fuelRatio)
+        public void CalculatePhysics(Vessel vessel,Part engine,float deltaTime,float fuelRatio)
         {
             Debug.Log("CalculatePhysics:start");
             physicsSimulator.Update(vessel, engine, deltaTime, fuelRatio);
             Debug.Log("CalculatePhysics:end");
         }
 
-        internal void reset()
+        public void reset()
         {
             Debug.Log("reset:start");
             physicsSimulator.Reset();
             Debug.Log("reset:end");
+        }
+
+        public void InitializeOverallEngineData(
+            float mCse_per_sqrt_t,
+            float mCscost,
+            float mPcns,
+            float mTcns,
+            float mPe,
+            float mAe,
+            float mmaxFuelFlow,
+            float mminFuelFlow,
+            float mfuelEfficiency = 1
+            )
+        {
+            Cse_per_sqrt_t = mCse_per_sqrt_t;
+            Cscost = mCscost;
+            chamberPressure = mPcns;
+            chamberTemp = mTcns;
+            nozzle_eArea = mAe;
+            nozzle_ePressure = mPe;
+            cycleMaxMassFlow = mmaxFuelFlow;
+            cycleMinMassFlow = mminFuelFlow;
+            cycleFuelEfficiency = mfuelEfficiency;
+            return;
         }
     }
 }
