@@ -273,6 +273,8 @@ namespace EngineDevelopment
             detC_o = (Isp_vac_o - Isp_atm_o) * 9.80665f;
             //detC==Cstar*(Ct_vac-Ct_atm)==Cstar*(ε(Pe)/Pc_ns-ε(Pe-Pa)/Pc_ns)==Cstar*ε*Pa/Pc_ns
             //It seems that we can use [Cstar*ε/sqrt(Tc_ns)] as a cost,so Gamma is included
+            //NONONO,I forgot that ε isn't a COST but a var of Pe and Pc_ns
+            //So we got a smaller Cstar
             Cse_per_sqrt_t_d = detC_o * Pcns_d / (Mathf.Sqrt(Tcns_d) * 101.3125f);//[Cstar*ε/sqrt(Tc_ns)]
             Cscost = Isp_vac_o * 9.80665f - detC_o  * (Pe_d)/ (101.3125f);//[Cstar*COST]
 
@@ -324,8 +326,8 @@ namespace EngineDevelopment
                 2896.138f,
                 2000,
                 3000,
-                50f,
-                0.7f,
+                30f,
+                1f,
                 63.74f,
                 0
                 );

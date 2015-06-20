@@ -111,6 +111,9 @@ namespace EngineDevelopment
         //detC==Cstar*(Ct_vac-Ct_atm)==Cstar*(ε(Pe)/Pc_ns-ε(Pe-Pa)/Pc_ns)==Cstar*ε*Pa/Pc_ns
         //Cse_per_sqrt_t==[Cstar*ε/sqrt(Tc_ns)]
         //Cscost_per_sqrt_t==[Cstar*COST/sqrt(Tc_ns)]
+
+        //NONONO,I forgot that ε isn't a COST but a var of Pe and Pc_ns
+        //So we got a smaller Cstar
         public override void CalculatePerformance(double airRatio, double commandedThrottle, double flowMult, double ispMult)
         {
             Debug.Log("\nCalc:start");
@@ -119,7 +122,7 @@ namespace EngineDevelopment
 
             base.CalculatePerformance(airRatio, commandedThrottle, flowMult, ispMult);
 
-            Cstar = Cse_per_sqrt_t * Math.Sqrt(chamberTemp) / nozzle_ExpansionRatio;
+            Cstar = Cse_per_sqrt_t * Math.Sqrt(chamberTemp) / nozzle_ExpansionRatio;//TODO:Calc the correct Cstar (
             Ct = Cscost / Cstar + nozzle_ExpansionRatio * (nozzle_ePressure - p0/1000) / chamberPressure;
             Isp = Cstar * Ct / 9.80665d;
             Isp *= ispMult;
