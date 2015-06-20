@@ -34,9 +34,9 @@ namespace EngineDevelopment
         private Vector3 localAcceleration = new Vector3();
         private Vector3 lastAcceleration = new Vector3();
         private Vector3 lastRotation = new Vector3();
-        private Queue<float> jerkAccum = new Queue<float>();
-        float jerkAccumAmount = 0;
-        float maxJerkAccumAmount = 0;
+        private Queue<float> jerksqrAccum = new Queue<float>();
+        float jerksqrAccumAmount = 0;
+        float maxJerksqrAccumAmount = 0;
         public string FuelFlowState
         {
             get
@@ -56,8 +56,8 @@ namespace EngineDevelopment
 			ullageHeightMin = 0.05f; ullageHeightMax = 0.95f;
 			ullageRadialMin = 0.0f; ullageRadialMax = 0.95f;
             localAcceleration = lastAcceleration = lastRotation = new Vector3(0, 0, 0);
-            jerkAccum.Clear();
-            jerkAccumAmount  = 0;
+            jerksqrAccum.Clear();
+            jerksqrAccumAmount  = 0;
         }
         public void Update(Vessel vessel, Part engine, float deltaTime,  float fuelRatio) {
             Debug.Log("Update:start");
@@ -139,13 +139,13 @@ namespace EngineDevelopment
             Debug.Log("UpdateJerk:start");
             if (TimeWarp.WarpMode == TimeWarp.Modes.HIGH && TimeWarp.CurrentRate > TimeWarp.MaxPhysicsRate)return;
             jerk = (( localAcceleration - lastAcceleration)/deltaTime).magnitude;
-            jerkAccumAmount += jerk;
-            jerkAccum.Enqueue(jerk);
-            if (jerkAccum.Count > (1 / deltaTime)) {
-                jerkAccumAmount -= jerkAccum.Dequeue();
+            jerksqrAccumAmount += jerk > 10 ? jerk * jerk* 0.0001f: 0;
+            jerksqrAccum.Enqueue(jerk > 10 ? jerk * jerk : 0);
+            if (jerksqrAccum.Count > (1 / deltaTime)) {
+                jerksqrAccumAmount -= jerksqrAccum.Dequeue();
             }
-            maxJerkAccumAmount = maxJerkAccumAmount > jerkAccumAmount ? maxJerkAccumAmount : jerkAccumAmount;
-            Debug.Log("UpdateJerk:end");
+            maxJerksqrAccumAmount = maxJerksqrAccumAmount > jerksqrAccumAmount ? maxJerksqrAccumAmount : jerksqrAccumAmount;
+            Debug.Log("UpdateJerk:end:"+jerksqrAccumAmount);
         }
 		public float GetFuelFlowStability(float fuelRatio)
 		{
@@ -182,9 +182,9 @@ namespace EngineDevelopment
 		}
         public float GetJerkDamage() {
             Debug.Log("Jerk: " + jerk);
-            Debug.Log("JerkAccumAmount: " + jerkAccumAmount + "::" + maxJerkAccumAmount);
+            Debug.Log("JerkAccumAmount: " + jerksqrAccumAmount + "::" + maxJerksqrAccumAmount);
             Debug.Log("AngularJerk: " + angularJerk);
-            return jerkAccumAmount;
+            return jerksqrAccumAmount;
         }
     }
 }
