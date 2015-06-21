@@ -8,35 +8,34 @@ namespace EngineDevelopment
 {
 	public class PhysicsSimulator
 	{
-		public static float s_NaturalDiffusionRateX = 0.02f;
-		public static float s_NaturalDiffusionRateY = 0.03f;
+        public static float s_NaturalDiffusionRateX = 0.015f;
+        public static float s_NaturalDiffusionRateY = 0.02f;
 
-		public static float s_TranslateAxialCoefficientX = 0.06f;
-		public static float s_TranslateAxialCoefficientY = 0.06f;
+        public static float s_TranslateAxialCoefficientX = 0.06f;
+        public static float s_TranslateAxialCoefficientY = 0.06f;
 
-		public static float s_TranslateSidewayCoefficientX = 0.04f;
-		public static float s_TranslateSidewayCoefficientY = 0.02f;
+        public static float s_TranslateSidewayCoefficientX = 0.04f;
+        public static float s_TranslateSidewayCoefficientY = 0.02f;
 
-		public static float s_RotateYawPitchCoefficientX = 0.003f;
-		public static float s_RotateYawPitchCoefficientY = 0.004f;
+        public static float s_RotateYawPitchCoefficientX = 0.003f;
+        public static float s_RotateYawPitchCoefficientY = 0.004f;
 
-		public static float s_RotateRollCoefficientX = 0.005f;
-		public static float s_RotateRollCoefficientY = 0.006f;
+        public static float s_RotateRollCoefficientX = 0.005f;
+        public static float s_RotateRollCoefficientY = 0.006f;
 
-		public static float s_VentingVelocity = 100.0f;
-		public static float s_VentingAccThreshold = 0.00000004f;
+        public static float s_VentingVelocity = 100.0f;
+        public static float s_VentingAccThreshold = 0.00000004f;
 
 
-		float ullageHeightMin, ullageHeightMax;
+        float ullageHeightMin, ullageHeightMax;
 		float ullageRadialMin, ullageRadialMax;
         float jerk=0,angularJerk=0;
 		string fuelFlowState = "";
         private Vector3 localAcceleration = new Vector3();
         private Vector3 lastAcceleration = new Vector3();
-        private Vector3 lastRotation = new Vector3();
         private Queue<float> jerksqrAccum = new Queue<float>();
-        float jerksqrAccumAmount = 0;
-        float maxJerksqrAccumAmount = 0;
+        public float jerksqrAccumAmount = 0;
+        public float maxJerksqrAccumAmount = 0;
         public string FuelFlowState
         {
             get
@@ -55,7 +54,7 @@ namespace EngineDevelopment
 		{
 			ullageHeightMin = 0.05f; ullageHeightMax = 0.95f;
 			ullageRadialMin = 0.0f; ullageRadialMax = 0.95f;
-            localAcceleration = lastAcceleration = lastRotation = new Vector3(0, 0, 0);
+            localAcceleration = lastAcceleration = new Vector3(0, 0, 0);
             jerksqrAccum.Clear();
             jerksqrAccumAmount  = 0;
         }
@@ -70,23 +69,26 @@ namespace EngineDevelopment
         }
         protected void UpdateUllage(Vessel vessel, Part engine, float deltaTime, float fuelRatio)
 		{
-            Debug.Log("UpdateUllage:start");
+            Debug.Log("UpdateUllage:start:dt::"+ deltaTime+"::fr::"+ fuelRatio);
             if (vessel.isActiveVessel == false) return;
 
 			float fuelRatioFactor = (0.5f + fuelRatio) / 1.4f;
 			float invFuelRatioFactor = 1.0f / fuelRatioFactor;
 
+            //kack for NaNs after reload
+            if (float.IsNaN(ullageHeightMin) || float.IsNaN(ullageHeightMax) || float.IsNaN(ullageRadialMin) || float.IsNaN(ullageRadialMax)) Reset();
 			//if (ventingAcc != 0.0f) Debug.Log("BoilOffAcc: " + ventingAcc.ToString("F8"));
 			//else Debug.Log("BoilOffAcc: No boiloff.");
 			Vector3 localAccelerationAmount = localAcceleration * deltaTime;
 			Vector3 rotationAmount = new Vector3();
             Vector3 rotation = new Vector3();
             if (engine.rigidbody != null && engine.rigidbody.angularVelocity != null)
-			{
-				rotationAmount = rotation * deltaTime;
-			}
+            {
+                rotation = engine.transform.InverseTransformDirection(engine.rigidbody.angularVelocity);
+                rotationAmount = rotation * deltaTime;
+            }
 
-			if ((TimeWarp.WarpMode == TimeWarp.Modes.HIGH && TimeWarp.CurrentRate > TimeWarp.MaxPhysicsRate)&&(vessel.LandedOrSplashed == true))
+            if ((TimeWarp.WarpMode == TimeWarp.Modes.HIGH && TimeWarp.CurrentRate > TimeWarp.MaxPhysicsRate)&&(vessel.LandedOrSplashed == true))
 			{
 				localAcceleration = engine.transform.InverseTransformDirection(-FlightGlobals.getGeeForceAtPosition(vessel.GetWorldPos3D()));
                 localAccelerationAmount = localAcceleration * deltaTime;
@@ -94,10 +96,14 @@ namespace EngineDevelopment
 			}
 
 			Debug.Log("Ullage: dt: " + deltaTime.ToString("F2") + " localAcc: " + localAcceleration.ToString() + " rotateRate: " + rotation.ToString());
-			
 
-			// Translate forward/backward.
-			ullageHeightMin = Mathf.Clamp(ullageHeightMin + localAccelerationAmount.y * s_TranslateAxialCoefficientY * fuelRatioFactor, 0.0f, 0.9f);
+            float ventingAcc = 0.00000002f;
+            ullageHeightMin = Mathf.Lerp(ullageHeightMin, 0.05f, s_NaturalDiffusionRateY * (1.0f - (ventingAcc / s_VentingAccThreshold)) * invFuelRatioFactor * deltaTime);
+            ullageHeightMax = Mathf.Lerp(ullageHeightMax, 0.95f, s_NaturalDiffusionRateY * (1.0f - (ventingAcc / s_VentingAccThreshold)) * invFuelRatioFactor * deltaTime);
+            ullageRadialMin = Mathf.Lerp(ullageRadialMin, 0.00f, s_NaturalDiffusionRateX * (1.0f - (ventingAcc / s_VentingAccThreshold)) * invFuelRatioFactor * deltaTime);
+            ullageRadialMax = Mathf.Lerp(ullageRadialMax, 0.95f, s_NaturalDiffusionRateX * (1.0f - (ventingAcc / s_VentingAccThreshold)) * invFuelRatioFactor * deltaTime);
+            // Translate forward/backward.
+            ullageHeightMin = Mathf.Clamp(ullageHeightMin + localAccelerationAmount.y * s_TranslateAxialCoefficientY * fuelRatioFactor, 0.0f, 0.9f);
 			ullageHeightMax = Mathf.Clamp(ullageHeightMax + localAccelerationAmount.y * s_TranslateAxialCoefficientY * fuelRatioFactor, 0.1f, 1.0f);
 			ullageRadialMin = Mathf.Clamp(ullageRadialMin - Mathf.Abs(localAccelerationAmount.y) * s_TranslateAxialCoefficientX * fuelRatioFactor, 0.0f, 0.9f);
 			ullageRadialMax = Mathf.Clamp(ullageRadialMax + Mathf.Abs(localAccelerationAmount.y) * s_TranslateAxialCoefficientX * fuelRatioFactor, 0.1f, 1.0f);
@@ -177,7 +183,7 @@ namespace EngineDevelopment
 				fuelFlowState = "Unstable";
 			else
 				fuelFlowState = "Very Unstable";
-            Debug.Log("GetFuelFlowStability:end");
+            Debug.Log("GetFuelFlowStability:end:"+FuelFlowState);
             return successProbability; 
 		}
         public float GetJerkDamage() {

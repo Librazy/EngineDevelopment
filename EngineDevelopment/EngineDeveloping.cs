@@ -4,7 +4,7 @@ using UnityEngine;
 using System.Collections.Generic;
 
 namespace EngineDevelopment
-{ 
+{
     public class EngineDeveloping : EngineSolver
     {
         protected float dynamicReliability;
@@ -63,8 +63,9 @@ namespace EngineDevelopment
         /// </summary>
         protected double cycleFuelEfficiency = 1;
         //Overall
-        protected double pR = -1;
 
+        protected double pR = -1;
+        protected float fxPower = 0f;
 
         private float Pe_d = -1, Ae_d = -1, maxFuelFlow_d = -1, minFuelFlow_d = -1, Tcns_d = -1, Pcns_d = -1, fuelEfficiency_d = -1;
 
@@ -120,16 +121,18 @@ namespace EngineDevelopment
             double gamma_d = CalculateGamma(Tcns_d, 1);//TODO:Fuel Fraction?
             double inv_gamma_d = 1 / gamma_d;
             double inv_gamma_dm1 = 1 / (gamma_d - 1);
-            double pR_Frac = Math.Sqrt(1 - Math.Pow(1/pR_d, ((gamma_d - 1) * inv_gamma_d)));
+            double pR_Frac = Math.Sqrt(1 - Math.Pow(1 / pR_d, ((gamma_d - 1) * inv_gamma_d)));
             double e_d =
                 (Math.Pow(2d / (gamma_d + 1d), (inv_gamma_dm1)) * Math.Pow(pR_d, inv_gamma_d))
                  /
                 Math.Sqrt((gamma_d + 1) * inv_gamma_dm1 * (1 - Math.Pow(1 / pR_d, gamma_d / inv_gamma_d)));
-            double sqrtT_d = Mathf.Sqrt(Tcns_d);
-            Cs_per_sqrt_t = detC_o * Pcns_d / (sqrtT_d * 101.3125f* e_d);//[Cstar/sqrt(Tc_ns)]
-            Cscost_per_pR_Frac_sqrt_t = (Isp_vac_o * 9.80665f - detC_o * (Pe_d) / (101.3125f))/ (pR_Frac*sqrtT_d);//[Cstar/sqrt(Tc_ns)*COST_per_pR_Frac]
-            Debug.Log("InitDef::" + cycleMaxMassFlow + "  " + cycleMinMassFlow + "  " + nozzle_ePressure + "  " + nozzle_eArea + "  " + chamberPressure + "  " + chamberTemp);
-            Debug.Log("InitDef::" + nozzle_ExpansionRatio + "  " + nozzle_tArea);
+            double sqrtT_d = Math.Sqrt(Tcns_d);
+            Cs_per_sqrt_t = detC_o * Pcns_d / (sqrtT_d * 101.3125f * e_d);//[Cstar/sqrt(Tc_ns)]
+            Cscost_per_pR_Frac_sqrt_t = (Isp_vac_o * 9.80665f - detC_o * (Pe_d) / (101.3125f)) / (pR_Frac * sqrtT_d);//[Cstar/sqrt(Tc_ns)*COST_per_pR_Frac]
+            Debug.Log("InitDef::" + maxFuelFlow_d + "  " + minFuelFlow_d + "  " + Pe_d + "  " + Ae_d + "  " + Pcns_d + "  " + Tcns_d);
+            Debug.Log("InitDef::" + Cs_per_sqrt_t + "  " + Cscost_per_pR_Frac_sqrt_t + "  " + pR_Frac);
+            Debug.Log("InitDef::" + Isp_vac_o + "  " + Isp_atm_o + " " + sqrtT_d);
+            Debug.Log("InitDef::" + pR_Frac + "  " + e_d + " " + gamma_d + " " + pR_d + " " + detC_o);
             return;
         }
         public void InitializeOverallEngineData(
@@ -150,13 +153,13 @@ namespace EngineDevelopment
             cycleMinMassFlow = mminFuelFlow;
             cycleFuelEfficiency = mfuelEfficiency;
             pR = chamberPressure / nozzle_ePressure;
-            double gamma_t=CalculateGamma(chamberTemp,1);//TODO:Fuel Fraction?
-            double inv_gamma_t= 1/gamma_t;
-            double inv_gamma_tm1= 1/(gamma_t-1);
-            nozzle_ExpansionRatio = 
-                (Math.Pow(2d / (gamma_t + 1d), (inv_gamma_tm1)) * Math.Pow(pR, inv_gamma_t)) 
+            double gamma_t = CalculateGamma(chamberTemp, 1);//TODO:Fuel Fraction?
+            double inv_gamma_t = 1 / gamma_t;
+            double inv_gamma_tm1 = 1 / (gamma_t - 1);
+            nozzle_ExpansionRatio =
+                (Math.Pow(2d / (gamma_t + 1d), (inv_gamma_tm1)) * Math.Pow(pR, inv_gamma_t))
                 /
-                Math.Sqrt((gamma_t+1)*inv_gamma_tm1*(1- Math.Pow(1/pR,gamma_t/inv_gamma_t)));
+                Math.Sqrt((gamma_t + 1) * inv_gamma_tm1 * (1 - Math.Pow(1 / pR, gamma_t / inv_gamma_t)));
             nozzle_tArea = nozzle_eArea / nozzle_ExpansionRatio;
             Debug.Log("InitEng::" + cycleMaxMassFlow + "  " + cycleMinMassFlow + "  " + nozzle_ePressure + "  " + nozzle_eArea + "  " + chamberPressure + "  " + chamberTemp);
             Debug.Log("InitEng::" + nozzle_ExpansionRatio + "  " + nozzle_tArea);
@@ -180,38 +183,52 @@ namespace EngineDevelopment
             Debug.Log("cycleMaxMassFlow:" + cycleMaxMassFlow);
             Debug.Log("cycleMinMassFlow:" + cycleMinMassFlow);
 
+            
+
+
             base.CalculatePerformance(airRatio, commandedThrottle, flowMult, ispMult);
             double gamma = CalculateGamma(chamberTemp, 1);//TODO:Fuel Fraction? Can we cache gamma?
             double inv_gamma = 1 / gamma;
             double inv_gamma_tm1 = 1 / (gamma - 1);
 
-            double pR_Frac = Math.Sqrt(1 - Math.Pow(1/pR, ((gamma - 1) * inv_gamma)));
+            double pR_Frac = Math.Sqrt(1 - Math.Pow(1 / pR, ((gamma - 1) * inv_gamma)));
 
 
             double sqrtT = Math.Sqrt(chamberTemp);
             Cstar = Cs_per_sqrt_t * sqrtT;//TODO:Calc the correct Cstar (
             Ct = Cscost_per_pR_Frac_sqrt_t * sqrtT * pR_Frac / Cstar + nozzle_ExpansionRatio * (nozzle_ePressure - p0 / 1000) / chamberPressure;
+            double pR_e = nozzle_ePressure * 1000d / p0;
+            if (pR_e < 0.4&& pR_e>=0.21) { Ct = Ct* Math.Sqrt(pR_e*5-1); }
+            if (pR_e < 0.211) { Ct = 0; }
             Isp = Cstar * Ct / 9.80665d;
             Isp *= ispMult;
-            Debug.Log(":::p0:" + p0/1000 + ":::Cscost_per_pR_Frac_per_sqrt_T:" + Cscost_per_pR_Frac_sqrt_t + ":::chamberPressure:" + chamberPressure+ ":::pR_Frac:"+ pR_Frac);
-            Debug.Log(":::Cstar:" + Cstar+":::Ct:"+Ct+ ":::ExpansionRatio:"+ nozzle_ExpansionRatio+":::Isp:"+Isp);
+            Debug.Log(":::p0:" + p0 / 1000 + ":::Cscost_per_pR_Frac_per_sqrt_T:" + Cscost_per_pR_Frac_sqrt_t + ":::chamberPressure:" + chamberPressure + ":::pR_Frac:" + pR_Frac);
+            Debug.Log(":::Cstar:" + Cstar + ":::Ct:" + Ct + ":::ExpansionRatio:" + nozzle_ExpansionRatio + ":::Isp:" + Isp);
             if (commandedThrottle * cycleMaxMassFlow < cycleMinMassFlow)
             {
                 commandedThrottle = cycleMinMassFlow / cycleMaxMassFlow;
             }
             fuelFlow = commandedThrottle * cycleMaxMassFlow * flowMult / cycleFuelEfficiency;
-
-            thrust = Isp * fuelFlow*9.80665;
-            Debug.Log("!!!!!!!Thrust:"+thrust);
+            fxPower = (float)(fuelFlow * ((Ct > 1.5f ? 1 : Ct / 1.5f)) / cycleMaxMassFlow);
+            thrust = Isp * fuelFlow * 9.80665;
+            Debug.Log("!!!!!!!Thrust:" + thrust);
             Debug.Log("Calc:end\n");
 
         }
+        public override double GetEngineTemp() { return chamberTemp; }
+
+        public override double GetEmissive() { return fxPower; }
+        public override float GetFXPower() { return fxPower; }
+        public override float GetFXRunning() { return fxPower; }
+        public override float GetFXThrottle() { return fxPower; }
+        public override float GetFXSpool() { return fxPower; }
+
 
         public void CalculatePhysics(Vessel vessel, Part engine, float deltaTime, float fuelRatio)
         {
             Debug.Log("CalculatePhysics:start");
             physicsSimulator.Update(vessel, engine, deltaTime, fuelRatio);
-            Debug.Log("CalculatePhysics:end");
+            Debug.Log("CalculatePhysics:end::"+physicsSimulator.FuelFlowState);
         }
 
         public void Reset()
@@ -221,13 +238,17 @@ namespace EngineDevelopment
             InitializeOverallEngineData(-1, -1, -1, -1, -1, -1, 1);
             Debug.Log("reset:end");
         }
-
-
-        public bool CheckForIgnition(float minFuelRatio)
+        public bool CheckForIgnition(float minFuelRatio,float jerkTolerance)
         {
-            float fuelFlowStability = physicsSimulator.GetFuelFlowStability(minFuelRatio);
-
-            return true;
+            float Stability = physicsSimulator.GetFuelFlowStability(minFuelRatio);
+            Debug.Log("fuelFlowStability:"+Stability);
+            float jerkRatio = physicsSimulator.jerksqrAccumAmount / jerkTolerance;
+            if (jerkRatio >= 1.3) { return false; }
+            if (jerkRatio > 0.8) { Stability *= (float)Math.Sqrt((jerkRatio - 0.7999) / 0.5001); }
+            
+            bool isSucceeded = (UnityEngine.Random.Range(0.0f, 1.0f) <= Stability);
+            Debug.Log("CheckForIgnition:" + isSucceeded);
+            return isSucceeded;
         }
 
     }

@@ -14,26 +14,8 @@ namespace EngineDevelopment
         public float temp;
         public bool pFed;
     }
-    class ModuleEngineDev : ModuleEnginesSolver, IPartCostModifier, IPartMassModifier
+    class ModuleEngineDev : ModuleEnginesSolver
     {
-        #region Fields
-        [KSPField(isPersistant = false, guiActive = false)]
-        public int maxBurnTime = 0;
-        [KSPField(isPersistant = true, guiActive = false)]
-        public int burningTime = 0;
-        [KSPField(isPersistant = true, guiActive = false)]
-        public int reliability = 0;
-        [KSPField(isPersistant = false, guiActive = true)]
-        public int ignitionsAvailable = 0;
-        [KSPField(isPersistant = true)]
-        public int ignitionsRemained = -1;
-        [KSPField(isPersistant = false, guiActive = false)]
-        public int jerkTolerance = 0;
-        [KSPField(isPersistant = false, guiActive = false)]
-        public int multiChamber = 0;
-
-        #endregion
-
         #region RF adapter
         private int vParts = -1;
         private static Type rfModule, rfTank;
@@ -164,104 +146,191 @@ namespace EngineDevelopment
         }
         #endregion
 
-        public List<ConfigNode> nozzleAlts;
-        public List<ConfigNode> cycleAlts;
-        public List<ConfigNode> chamberAlts;
-        private ConfigNode cycleDefault = null;
-        private ConfigNode nozzleDefault = null;
-        private ConfigNode chamberDefault = null;
-        private ConfigNode cycleChoice = null;
-        private ConfigNode nozzleChoice = null;
-        private ConfigNode chamberChoice = null;
+        #region Fields
+        [KSPField(isPersistant = false, guiActive = false)]
+        public int maxBurnTime = 0;
+        [KSPField(isPersistant = true, guiActive = false)]
+        public int burningTime = 0;
+        [KSPField(isPersistant = true, guiActive = false)]
+        public int reliability = 0;
+        [KSPField(isPersistant = false)]
+        public int ignitionsAvailable = -1;
+        [KSPField(isPersistant = true, guiActive = true)]
+        public int ignitionsRemained = -1;
+        [KSPField(isPersistant = false, guiActive = false)]
+        public int jerkTolerance = 0;
+        [KSPField(isPersistant = false, guiActive = false)]
+        public int multiChamber = 0;
+
+        #endregion
+
         private float massMult = 1;
         private float costMult = 1;
+        //TEMPORARY
+        [KSPField(isPersistant = false, guiActive = false)]
+        public float Ped = -1;
+        [KSPField(isPersistant = false, guiActive = false)]
+        public float Aed = -1;
+        [KSPField(isPersistant = false, guiActive = false)]
+        public float maxFuelFlowd = -1;
+        [KSPField(isPersistant = false, guiActive = false)]
+        public float minFuelFlowd = -1;
+        [KSPField(isPersistant = false, guiActive = false)]
+        public float Tcnsd = -1;
+        [KSPField(isPersistant = false, guiActive = false)]
+        public float Pcnsd = -1;
 
-        [KSPField(isPersistant = true, guiActive = false)]
-        public float Pe_d = -1, Ae_d = -1, maxFuelFlow_d = -1, minFuelFlow_d = -1, Tcns_d = -1, Pcns_d = -1;
-        [KSPField(isPersistant = true, guiActive = false)]
-        public float Pe_c = -1, Ae_c = -1, maxFuelFlow_c = -1, minFuelFlow_c = -1, Tcns_c = -1, Pcns_c = -1;
 
+
+        [KSPField(isPersistant = false, guiActive = false)]
+        public float Pec = -1;
+        [KSPField(isPersistant = false, guiActive = false)]
+        public float Aec = -1;
+        [KSPField(isPersistant = false, guiActive = false)]
+        public float maxFuelFlowc = -1;
+        [KSPField(isPersistant = false, guiActive = false)]
+        public float minFuelFlowc = -1;
+        [KSPField(isPersistant = false, guiActive = false)]
+        public float Tcnsc = -1;
+        [KSPField(isPersistant = false, guiActive = false)]
+        public float Pcnsc = -1;
+
+        public bool combusting = false;
         #region Overrides
+        public override void OnStart(StartState state)
+        {
+            base.OnStart(state);
+            if (state == StartState.Editor)
+            {
+                ignitionsRemained = ignitionsAvailable;
+            }
+        }
+        public override void Activate()
+        {
+            Debug.Log("Activate:start");
+            if (!allowRestart && engineShutdown)
+            {
+                return; // If the engines were shutdown previously and restarting is not allowed, prevent restart of engines
+            }
+            if (noShieldedStart && part.ShieldedFromAirstream)
+            {
+                ScreenMessages.PostScreenMessage("<color=orange>[" + part.partInfo.title + "]: Cannot activate while stowed!</color>", 6f, ScreenMessageStyle.UPPER_LEFT);
+                return;
+            }
+            if (vessel.ctrlState.mainThrottle <= 0 && requestedThrottle <= 0) {
+                if (allowShutdown) Events["Shutdown"].active = true;
+                else Events["Shutdown"].active = false;
+                Events["Activate"].active = false;
+                EngineIgnited = true;
+                Debug.Log("Activate::ZeroThrottle");
+                return;
+            }
+            currentThrottle = actualThrottle = 0;
+            requestedThrottle = vessel.ctrlState.mainThrottle;//Need to check in the Throttle before trying to ignite
+            Debug.Log("Activate::" + combusting + " " + requestedThrottle);
+            UpdateThrottle();
+            Debug.Log("Activate:::" + combusting);
+            if (combusting)
+            {
+                if (allowShutdown) Events["Shutdown"].active = true;
+                else Events["Shutdown"].active = false;
+                Events["Activate"].active = false;
+                EngineIgnited = true;
+                Debug.Log("Activate::succeeded");
+            }
+            else
+            {
+                requestedThrottle = currentThrottle = actualThrottle = 0;
+                Shutdown();
+                Debug.Log("Activate::failed");
+            }
+
+        }
         public override void CreateEngine()
         {
             Debug.Log("CreateEngine:start");
             engineSolver = new EngineDeveloping();
-            //(engineSolver as EngineDeveloping).InitializeOverallEngineData(
-            //    Pcns_c,
-            //    Tcns_c,
-            //    Pe_c,
-            //    Ae_c,
-            //    maxFuelFlow_c,
-            //    minFuelFlow_c
-            //    );
             (engineSolver as EngineDeveloping).InitializeDefaultEngineData(
                 atmosphereCurve.Evaluate(0),
                 atmosphereCurve.Evaluate(1),
                 maxThrust,
-                2000,
-                3000,
-                50f,
-                0.7f,
-                63.74f,
-                0f,
+                Pcnsd,
+                Tcnsd,
+                Ped,
+                Aed,
+                maxFuelFlowd,
+                minFuelFlowd,
                 1f
             );
             (engineSolver as EngineDeveloping).InitializeOverallEngineData(
-                2500,
-                3300,
-                20f,//Pe
-                1f,//Ae
-                63.74f,
-                0f,
+                Pcnsc,
+                Tcnsc,
+                Pec,
+                Aec,
+                maxFuelFlowc,
+                minFuelFlowc,
                 1f
             );
             useAtmCurve = useAtmCurve = false;
+            Debug.Log("CreateEngine:" + ignitionsAvailable);
             Debug.Log("CreateEngine:end");
         }
-        public override void OnAwake()
+        public override void FixedUpdate()
         {
-            Debug.Log("OnAwake:start");
-            base.OnAwake();
-            nozzleAlts = new List<ConfigNode>();
-            cycleAlts = new List<ConfigNode>();
-            chamberAlts = new List<ConfigNode>();
-            vesselTanks = new Dictionary<Part, Dictionary<string, RFTank>>();
-            nozzleDefault = new ConfigNode("NOZZLEALT");
-            cycleDefault = new ConfigNode("POWERCYCLEALT");
-            chamberDefault = new ConfigNode("CHAMBERALT");
-            /*TEMPORARY*/
-            nozzleChoice = new ConfigNode("NOZZLEALT");
-            /*TEMPORARY*/
-            cycleChoice = new ConfigNode("POWERCYCLEALT");
-            /*TEMPORARY*/
-            chamberChoice = new ConfigNode("CHAMBERALT");
-            Debug.Log("OnAwake:end");
+            Debug.Log("FixedUpdate");
+            base.FixedUpdate();
+            (engineSolver as EngineDeveloping).CalculatePhysics(vessel, part, TimeWarp.fixedDeltaTime, RFFuelRatio());
         }
         public override void UpdateFlightCondition(EngineThermodynamics ambientTherm, double altitude, Vector3d vel, double mach, bool oxygen)
         {
+
             Debug.Log("UpdateFlightCondition:start");
             Debug.Log("UpdateFlightCondition:" + ambientTherm + "-" + altitude + "-" + vel + "-" + mach + "-" + oxygen);
             Debug.Log("UpdateFlightCondition:Engine :T" + engineSolver.GetEngineTemp() + ",Isp:" + engineSolver.GetIsp() + ",S:" + engineSolver.GetStatus() + ",R:" + engineSolver.GetRunning());
             base.UpdateFlightCondition(ambientTherm, altitude, vel, mach, oxygen);
-            (engineSolver as EngineDeveloping).CalculatePhysics(vessel, part, TimeWarp.fixedDeltaTime, RFFuelRatio());
-
-
-            Debug.Log("UpdateFlightCondition:end");
+            Debug.Log("UpdateFlightCondition:end::");
         }
 
         public override void UpdateThrottle()
         {
+
+            Debug.Log("UpdateThrottle:start:cur::" + currentThrottle + "::req:::" + requestedThrottle + "::comb::" + combusting);
             if (throttleLocked)
                 requestedThrottle = 1f;
-            if ((!EngineIgnited) && (ignitionsRemained > 0 || ignitionsRemained == -1) && (currentThrottle <= 0.01f) && requestedThrottle >= 0.01f)
+            if (!(!HighLogic.LoadedSceneIsEditor && !(HighLogic.LoadedSceneIsFlight && vessel != null && vessel.situation == Vessel.Situations.PRELAUNCH))) return;
+            if (currentThrottle <= 0.00f)
             {
-                if (!(engineSolver as EngineDeveloping).CheckForIgnition(RFFuelRatio()))
-                { currentThrottle = actualThrottle = 0; SetFlameout(); PlayFlameoutFX(true); return; }
-                else EngineIgnited = true;
+                combusting = false;
+                currentThrottle = actualThrottle = 0;
+            }
+
+            if ((!combusting) && (ignitionsRemained > 0 || ignitionsRemained == -1) && (currentThrottle <= 0.00f) && requestedThrottle > 0.000001f)
+            {
+                Debug.Log("UpdateThrottle:try" + combusting + "::" + ignitionsRemained);
                 ignitionsRemained = (ignitionsRemained == -1) ? -1 : (ignitionsRemained - 1);
+                if (!(engineSolver as EngineDeveloping).CheckForIgnition(RFFuelRatio(),jerkTolerance))
+                {
+                    combusting = false;
+                    currentThrottle = actualThrottle = 0;
+                    SetFlameout();
+                    PlayFlameoutFX(true);
+                    Debug.Log("UpdateThrottle:failed" + combusting + "::" + ignitionsRemained);
+                    return;
+                }
+                combusting = true;
+                Debug.Log("UpdateThrottle:succeeded" + combusting + "::" + ignitionsRemained);
+                SetUnflameout();
+                PlayEngageFX();
+            }
+            if (!combusting)
+            {
+                currentThrottle = actualThrottle = 0;
+                return;
             }
             if (!useEngineResponseTime)
+            {
                 currentThrottle = requestedThrottle * thrustPercentage * 0.01f;
+            }
             else
             {
                 float requiredThrottle = requestedThrottle * thrustPercentage * 0.01f;
@@ -279,8 +348,10 @@ namespace EngineDevelopment
                 else
                     currentThrottle = requiredThrottle;
             }
+
             currentThrottle = Mathf.Max(0.000f, currentThrottle);
             actualThrottle = Mathf.RoundToInt(currentThrottle * 100f);
+
             //Don't need base.UpdateThrottle here
         }
         #endregion
@@ -310,16 +381,6 @@ namespace EngineDevelopment
             return output;
         }
         #endregion
-
-        public float GetModuleCost(float defaultCost)
-        {
-            return defaultCost * costMult;
-        }
-
-        public float GetModuleMass(float defaultMass)
-        {
-            return defaultMass * massMult;
-        }
     }
 
 }

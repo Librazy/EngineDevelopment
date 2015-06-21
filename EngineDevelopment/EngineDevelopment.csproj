@@ -70,6 +70,7 @@
     <Content Include="liquidEngineLV-T233\model003.dds" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="liquidEngineLV-T233\liquidEngineLV-T233-RealFuel.cfg" />
     <None Include="liquidEngineLV-T233\liquidEngineLV-T233.cfg" />
     <None Include="liquidEngineLV-T233\model.mu" />
     <None Include="liquidEngineLV-T233\Test.cfg" />
