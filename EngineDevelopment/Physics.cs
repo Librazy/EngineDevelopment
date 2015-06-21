@@ -139,8 +139,8 @@ namespace EngineDevelopment
             Debug.Log("UpdateJerk:start");
             if (TimeWarp.WarpMode == TimeWarp.Modes.HIGH && TimeWarp.CurrentRate > TimeWarp.MaxPhysicsRate)return;
             jerk = (( localAcceleration - lastAcceleration)/deltaTime).magnitude;
-            jerksqrAccumAmount += jerk > 10 ? jerk * jerk* 0.0001f: 0;
-            jerksqrAccum.Enqueue(jerk > 10 ? jerk * jerk : 0);
+            jerksqrAccumAmount += jerk > 10 ? jerk * jerk * 0.0001f : 0;
+            jerksqrAccum.Enqueue(jerk > 10 ? jerk * jerk* 0.0001f: 0);
             if (jerksqrAccum.Count > (1 / deltaTime)) {
                 jerksqrAccumAmount -= jerksqrAccum.Dequeue();
             }

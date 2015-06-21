@@ -64,6 +64,15 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="LICENSE-EI.txt" />
+    <Content Include="liquidEngineLV-T233\model000.dds" />
+    <Content Include="liquidEngineLV-T233\model001.dds" />
+    <Content Include="liquidEngineLV-T233\model002.dds" />
+    <Content Include="liquidEngineLV-T233\model003.dds" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="liquidEngineLV-T233\liquidEngineLV-T233.cfg" />
+    <None Include="liquidEngineLV-T233\model.mu" />
+    <None Include="liquidEngineLV-T233\Test.cfg" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
