@@ -7,11 +7,7 @@ namespace EngineDevelopment
 {
     public class EngineDeveloping : EngineSolver
     {
-        protected float dynamicReliability;
         public PhysicsSimulator physicsSimulator = new PhysicsSimulator();
-
-
-
 
         //Chamber
         /// <summary>
@@ -66,6 +62,7 @@ namespace EngineDevelopment
 
         protected double pR = -1;
         protected float fxPower = 0f;
+        public float stability = 0f;
 
         private float Pe_d = -1, Ae_d = -1, maxFuelFlow_d = -1, minFuelFlow_d = -1, Tcns_d = -1, Pcns_d = -1, fuelEfficiency_d = -1;
 
@@ -73,8 +70,8 @@ namespace EngineDevelopment
         private float Isp_atm_o = -1;
         private double Cs_per_sqrt_t = -1;
         private double Cscost_per_pR_Frac_sqrt_t = -1;
-        private double Cstar = -1;
-        private double Ct = -1;
+        public double Cstar = -1;
+        public double Ct = -1;
         private double FF_o = -1;
         private double detC_o = -1;
 
@@ -129,10 +126,10 @@ namespace EngineDevelopment
             double sqrtT_d = Math.Sqrt(Tcns_d);
             Cs_per_sqrt_t = detC_o * Pcns_d / (sqrtT_d * 101.3125f * e_d);//[Cstar/sqrt(Tc_ns)]
             Cscost_per_pR_Frac_sqrt_t = (Isp_vac_o * 9.80665f - detC_o * (Pe_d) / (101.3125f)) / (pR_Frac * sqrtT_d);//[Cstar/sqrt(Tc_ns)*COST_per_pR_Frac]
-            Debug.Log("InitDef::" + maxFuelFlow_d + "  " + minFuelFlow_d + "  " + Pe_d + "  " + Ae_d + "  " + Pcns_d + "  " + Tcns_d);
-            Debug.Log("InitDef::" + Cs_per_sqrt_t + "  " + Cscost_per_pR_Frac_sqrt_t + "  " + pR_Frac);
-            Debug.Log("InitDef::" + Isp_vac_o + "  " + Isp_atm_o + " " + sqrtT_d);
-            Debug.Log("InitDef::" + pR_Frac + "  " + e_d + " " + gamma_d + " " + pR_d + " " + detC_o);
+            //Debug.Log("InitDef::" + maxFuelFlow_d + "  " + minFuelFlow_d + "  " + Pe_d + "  " + Ae_d + "  " + Pcns_d + "  " + Tcns_d);
+            //Debug.Log("InitDef::" + Cs_per_sqrt_t + "  " + Cscost_per_pR_Frac_sqrt_t + "  " + pR_Frac);
+            //Debug.Log("InitDef::" + Isp_vac_o + "  " + Isp_atm_o + " " + sqrtT_d);
+            //Debug.Log("InitDef::" + pR_Frac + "  " + e_d + " " + gamma_d + " " + pR_d + " " + detC_o);
             return;
         }
         public void InitializeOverallEngineData(
@@ -161,8 +158,8 @@ namespace EngineDevelopment
                 /
                 Math.Sqrt((gamma_t + 1) * inv_gamma_tm1 * (1 - Math.Pow(1 / pR, gamma_t / inv_gamma_t)));
             nozzle_tArea = nozzle_eArea / nozzle_ExpansionRatio;
-            Debug.Log("InitEng::" + cycleMaxMassFlow + "  " + cycleMinMassFlow + "  " + nozzle_ePressure + "  " + nozzle_eArea + "  " + chamberPressure + "  " + chamberTemp);
-            Debug.Log("InitEng::" + nozzle_ExpansionRatio + "  " + nozzle_tArea);
+            //Debug.Log("InitEng::" + cycleMaxMassFlow + "  " + cycleMinMassFlow + "  " + nozzle_ePressure + "  " + nozzle_eArea + "  " + chamberPressure + "  " + chamberTemp);
+            //Debug.Log("InitEng::" + nozzle_ExpansionRatio + "  " + nozzle_tArea);
             return;
         }
         //Units:V-m/s    T-k    P-kPa   Isp-s   FF-ton/s
@@ -179,13 +176,6 @@ namespace EngineDevelopment
 
         public override void CalculatePerformance(double airRatio, double commandedThrottle, double flowMult, double ispMult)
         {
-            Debug.Log("\nCalc:start");
-            Debug.Log("cycleMaxMassFlow:" + cycleMaxMassFlow);
-            Debug.Log("cycleMinMassFlow:" + cycleMinMassFlow);
-
-            
-
-
             base.CalculatePerformance(airRatio, commandedThrottle, flowMult, ispMult);
             double gamma = CalculateGamma(chamberTemp, 1);//TODO:Fuel Fraction? Can we cache gamma?
             double inv_gamma = 1 / gamma;
@@ -197,23 +187,22 @@ namespace EngineDevelopment
             double sqrtT = Math.Sqrt(chamberTemp);
             Cstar = Cs_per_sqrt_t * sqrtT;//TODO:Calc the correct Cstar (
             Ct = Cscost_per_pR_Frac_sqrt_t * sqrtT * pR_Frac / Cstar + nozzle_ExpansionRatio * (nozzle_ePressure - p0 / 1000) / chamberPressure;
+            Ct = Ct >= 0 ? Ct : 0;
             double pR_e = nozzle_ePressure * 1000d / p0;
-            if (pR_e < 0.4&& pR_e>=0.21) { Ct = Ct* Math.Sqrt(pR_e*5-1); }
-            if (pR_e < 0.211) { Ct = 0; }
+            statusString = "Normal";
+            if (pR_e < 0.3 && pR_e >= 0.1) { Ct = Ct * Math.Sqrt(pR_e * 5 - 0.50f); statusString = "Jet Sepration"; }//TODO:Actually jet sepration wouldn't cost so much
+            if (pR_e < 0.10001) { Ct = 0; statusString = "Unstable Jet Sepration"; }
             Isp = Cstar * Ct / 9.80665d;
             Isp *= ispMult;
-            Debug.Log(":::p0:" + p0 / 1000 + ":::Cscost_per_pR_Frac_per_sqrt_T:" + Cscost_per_pR_Frac_sqrt_t + ":::chamberPressure:" + chamberPressure + ":::pR_Frac:" + pR_Frac);
-            Debug.Log(":::Cstar:" + Cstar + ":::Ct:" + Ct + ":::ExpansionRatio:" + nozzle_ExpansionRatio + ":::Isp:" + Isp);
             if (commandedThrottle * cycleMaxMassFlow < cycleMinMassFlow)
             {
                 commandedThrottle = cycleMinMassFlow / cycleMaxMassFlow;
             }
             fuelFlow = commandedThrottle * cycleMaxMassFlow * flowMult / cycleFuelEfficiency;
             fxPower = (float)(fuelFlow * ((Ct > 1.5f ? 1 : Ct / 1.5f)) / cycleMaxMassFlow);
+            running = fuelFlow > 0;
             thrust = Isp * fuelFlow * 9.80665;
-            Debug.Log("!!!!!!!Thrust:" + thrust);
-            Debug.Log("Calc:end\n");
-
+            //Debug.Log("fxPower"+fxPower);
         }
         public override double GetEngineTemp() { return chamberTemp; }
 
@@ -222,32 +211,30 @@ namespace EngineDevelopment
         public override float GetFXRunning() { return fxPower; }
         public override float GetFXThrottle() { return fxPower; }
         public override float GetFXSpool() { return fxPower; }
+        public override bool GetRunning() { return fuelFlow > 0; }
 
-
-        public void CalculatePhysics(Vessel vessel, Part engine, float deltaTime, float fuelRatio)
+        public void CalculatePhysics(Vessel vessel, Part engine, float deltaTime, float fuelRatio, float jerkTolerance)
         {
-            Debug.Log("CalculatePhysics:start");
             physicsSimulator.Update(vessel, engine, deltaTime, fuelRatio);
-            Debug.Log("CalculatePhysics:end::"+physicsSimulator.FuelFlowState);
+            stability = physicsSimulator.GetFuelFlowStability(fuelRatio);
+            float jerkRatio = physicsSimulator.jerksqrAccumAmount / jerkTolerance;
+            if (jerkRatio >= 1.3) { stability = 0; }
+            if (jerkRatio > 0.8) { stability *= (float)Math.Sqrt((jerkRatio - 0.7999) / 0.5001); }
         }
 
         public void Reset()
         {
-            Debug.Log("reset:start");
             physicsSimulator.Reset();
             InitializeOverallEngineData(-1, -1, -1, -1, -1, -1, 1);
-            Debug.Log("reset:end");
         }
-        public bool CheckForIgnition(float minFuelRatio,float jerkTolerance)
+        public bool CheckForIgnition(float minFuelRatio, float jerkTolerance)
         {
-            float Stability = physicsSimulator.GetFuelFlowStability(minFuelRatio);
-            Debug.Log("fuelFlowStability:"+Stability);
+            stability = physicsSimulator.GetFuelFlowStability(minFuelRatio);
             float jerkRatio = physicsSimulator.jerksqrAccumAmount / jerkTolerance;
             if (jerkRatio >= 1.3) { return false; }
-            if (jerkRatio > 0.8) { Stability *= (float)Math.Sqrt((jerkRatio - 0.7999) / 0.5001); }
-            
-            bool isSucceeded = (UnityEngine.Random.Range(0.0f, 1.0f) <= Stability);
-            Debug.Log("CheckForIgnition:" + isSucceeded);
+            if (jerkRatio > 0.8) { stability *= (float)Math.Sqrt((jerkRatio - 0.7999) / 0.5001); }
+
+            bool isSucceeded = (UnityEngine.Random.Range(0.0f, 1.0f) <= stability);
             return isSucceeded;
         }
 

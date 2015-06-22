@@ -27,10 +27,11 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>GameData\EngineDevelopment\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
@@ -63,17 +64,15 @@
     <Compile Include="Physics.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="GameData\EngineDevelopment\EngineDevelopment.dll" />
+    <Content Include="GameData\EngineDevelopment\EngineDevelopment.pdb" />
+    <Content Include="GameData\SolverEngines\Icons\EnginesIconBlizzy.png" />
+    <Content Include="GameData\SolverEngines\Icons\EnginesIconStock.png" />
+    <Content Include="GameData\SolverEngines\Plugins\ModuleAnimateEmissive.dll" />
+    <Content Include="GameData\SolverEngines\Plugins\PluginData\SolverEngines\config.xml" />
+    <Content Include="GameData\SolverEngines\Plugins\SolverEngines.dll" />
+    <Content Include="GameData\SolverEngines\Readme_SolverEngines.txt" />
     <Content Include="LICENSE-EI.txt" />
-    <Content Include="liquidEngineLV-T233\model000.dds" />
-    <Content Include="liquidEngineLV-T233\model001.dds" />
-    <Content Include="liquidEngineLV-T233\model002.dds" />
-    <Content Include="liquidEngineLV-T233\model003.dds" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="liquidEngineLV-T233\liquidEngineLV-T233-RealFuel.cfg" />
-    <None Include="liquidEngineLV-T233\liquidEngineLV-T233.cfg" />
-    <None Include="liquidEngineLV-T233\model.mu" />
-    <None Include="liquidEngineLV-T233\Test.cfg" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

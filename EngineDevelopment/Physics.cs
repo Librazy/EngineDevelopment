@@ -8,8 +8,8 @@ namespace EngineDevelopment
 {
 	public class PhysicsSimulator
 	{
-        public static float s_NaturalDiffusionRateX = 0.015f;
-        public static float s_NaturalDiffusionRateY = 0.02f;
+        public static float s_NaturalDiffusionRateX = 0.03f;
+        public static float s_NaturalDiffusionRateY = 0.04f;
 
         public static float s_TranslateAxialCoefficientX = 0.06f;
         public static float s_TranslateAxialCoefficientY = 0.06f;
@@ -30,24 +30,11 @@ namespace EngineDevelopment
         float ullageHeightMin, ullageHeightMax;
 		float ullageRadialMin, ullageRadialMax;
         float jerk=0,angularJerk=0;
-		string fuelFlowState = "";
         private Vector3 localAcceleration = new Vector3();
         private Vector3 lastAcceleration = new Vector3();
         private Queue<float> jerksqrAccum = new Queue<float>();
         public float jerksqrAccumAmount = 0;
         public float maxJerksqrAccumAmount = 0;
-        public string FuelFlowState
-        {
-            get
-            {
-                return fuelFlowState;
-            }
-
-            private set
-            {
-                fuelFlowState = value;
-            }
-        }
 
 
         public void Reset()
@@ -59,26 +46,27 @@ namespace EngineDevelopment
             jerksqrAccumAmount  = 0;
         }
         public void Update(Vessel vessel, Part engine, float deltaTime,  float fuelRatio) {
-            Debug.Log("Update:start");
+            //Debug.Log("Update:start");
             localAcceleration = engine.transform.InverseTransformDirection(vessel.acceleration - FlightGlobals.getGeeForceAtPosition(vessel.GetWorldPos3D()));
             UpdateUllage(vessel, engine, deltaTime, fuelRatio);
             UpdateJerk(vessel, engine, deltaTime);
             lastAcceleration = localAcceleration;
             //GetJerkDamage();
-            Debug.Log("Update:end");
+            //Debug.Log("Update:end");
         }
         protected void UpdateUllage(Vessel vessel, Part engine, float deltaTime, float fuelRatio)
 		{
-            Debug.Log("UpdateUllage:start:dt::"+ deltaTime+"::fr::"+ fuelRatio);
+            //Debug.Log("UpdateUllage:start:dt::"+ deltaTime+"::fr::"+ fuelRatio);
             if (vessel.isActiveVessel == false) return;
 
 			float fuelRatioFactor = (0.5f + fuelRatio) / 1.4f;
 			float invFuelRatioFactor = 1.0f / fuelRatioFactor;
 
             //kack for NaNs after reload
+            //TODO:Persist the ullage*
             if (float.IsNaN(ullageHeightMin) || float.IsNaN(ullageHeightMax) || float.IsNaN(ullageRadialMin) || float.IsNaN(ullageRadialMax)) Reset();
-			//if (ventingAcc != 0.0f) Debug.Log("BoilOffAcc: " + ventingAcc.ToString("F8"));
-			//else Debug.Log("BoilOffAcc: No boiloff.");
+			//if (ventingAcc != 0.0f) //Debug.Log("BoilOffAcc: " + ventingAcc.ToString("F8"));
+			//else //Debug.Log("BoilOffAcc: No boiloff.");
 			Vector3 localAccelerationAmount = localAcceleration * deltaTime;
 			Vector3 rotationAmount = new Vector3();
             Vector3 rotation = new Vector3();
@@ -95,9 +83,9 @@ namespace EngineDevelopment
                 rotation.Set(0.0f, 0.0f, 0.0f);
 			}
 
-			Debug.Log("Ullage: dt: " + deltaTime.ToString("F2") + " localAcc: " + localAcceleration.ToString() + " rotateRate: " + rotation.ToString());
+			//Debug.Log("Ullage: dt: " + deltaTime.ToString("F2") + " localAcc: " + localAcceleration.ToString() + " rotateRate: " + rotation.ToString());
 
-            float ventingAcc = 0.00000002f;
+            float ventingAcc = 0.00000001f;
             ullageHeightMin = Mathf.Lerp(ullageHeightMin, 0.05f, s_NaturalDiffusionRateY * (1.0f - (ventingAcc / s_VentingAccThreshold)) * invFuelRatioFactor * deltaTime);
             ullageHeightMax = Mathf.Lerp(ullageHeightMax, 0.95f, s_NaturalDiffusionRateY * (1.0f - (ventingAcc / s_VentingAccThreshold)) * invFuelRatioFactor * deltaTime);
             ullageRadialMin = Mathf.Lerp(ullageRadialMin, 0.00f, s_NaturalDiffusionRateX * (1.0f - (ventingAcc / s_VentingAccThreshold)) * invFuelRatioFactor * deltaTime);
@@ -136,13 +124,13 @@ namespace EngineDevelopment
 			ullageRadialMin = Mathf.Clamp(ullageRadialMin - Mathf.Abs(rotation.y) * s_RotateRollCoefficientX * fuelRatioFactor, 0.0f, 0.9f);
 			ullageRadialMax = Mathf.Clamp(ullageRadialMax - Mathf.Abs(rotation.y) * s_RotateRollCoefficientX * fuelRatioFactor, 0.1f, 1.0f);
 
-			Debug.Log("Ullage: Height: (" + ullageHeightMin.ToString("F2") + " - " + ullageHeightMax.ToString("F2") + ") Radius: (" + ullageRadialMin.ToString("F2") + " - " + ullageRadialMax.ToString("F2") + ")");
-            Debug.Log("UpdateUllage:end");
+			//Debug.Log("Ullage: Height: (" + ullageHeightMin.ToString("F2") + " - " + ullageHeightMax.ToString("F2") + ") Radius: (" + ullageRadialMin.ToString("F2") + " - " + ullageRadialMax.ToString("F2") + ")");
+            //Debug.Log("UpdateUllage:end");
 
         }
         protected void UpdateJerk(Vessel vessel, Part engine, float deltaTime)
         {
-            Debug.Log("UpdateJerk:start");
+            //Debug.Log("UpdateJerk:start");
             if (TimeWarp.WarpMode == TimeWarp.Modes.HIGH && TimeWarp.CurrentRate > TimeWarp.MaxPhysicsRate)return;
             jerk = (( localAcceleration - lastAcceleration)/deltaTime).magnitude;
             jerksqrAccumAmount += jerk > 10 ? jerk * jerk * 0.0001f : 0;
@@ -151,45 +139,33 @@ namespace EngineDevelopment
                 jerksqrAccumAmount -= jerksqrAccum.Dequeue();
             }
             maxJerksqrAccumAmount = maxJerksqrAccumAmount > jerksqrAccumAmount ? maxJerksqrAccumAmount : jerksqrAccumAmount;
-            Debug.Log("UpdateJerk:end:"+jerksqrAccumAmount);
+            //Debug.Log("UpdateJerk:end:"+jerksqrAccumAmount);
         }
 		public float GetFuelFlowStability(float fuelRatio)
 		{
-            Debug.Log("GetFuelFlowStability:start");
+            //Debug.Log("GetFuelFlowStability:start");
             float bLevel = Mathf.Clamp((ullageHeightMax - ullageHeightMin) * (ullageRadialMax - ullageRadialMin) / 0.1f * Mathf.Clamp(8.2f - 8 * fuelRatio, 0.0f, 8.2f) - 1.0f, 0.0f, 15.0f);
-			Debug.Log("Ullage: bLevel: " + bLevel.ToString("F3"));
+			//Debug.Log("Ullage: bLevel: " + bLevel.ToString("F3"));
 	
 			float pVertical = 1.0f;
 			pVertical = 1.0f - (ullageHeightMin - 0.1f) / 0.2f;
 			pVertical = Mathf.Clamp01(pVertical);
-			Debug.Log("Ullage: pVertical: " + pVertical.ToString("F3"));
+			//Debug.Log("Ullage: pVertical: " + pVertical.ToString("F3"));
 	
 			float pHorizontal = 1.0f;
 			pHorizontal = 1.0f - (ullageRadialMin - 0.1f) / 0.2f;
 			pHorizontal = Mathf.Clamp01(pHorizontal);
-			Debug.Log("Ullage: pHorizontal: " + pHorizontal.ToString("F3"));
+			//Debug.Log("Ullage: pHorizontal: " + pHorizontal.ToString("F3"));
 			
 			float successProbability = Mathf.Max(0.0f, 1.0f - (pVertical * pHorizontal * (0.75f + Mathf.Sqrt(bLevel))));
 			
-			if (successProbability >= 0.996f)
-				fuelFlowState = "Very Stable";
-			else if (successProbability >= 0.95f)
-				fuelFlowState = "Stable";
-			else if (successProbability >= 0.75f)
-				fuelFlowState = "Risky";
-			else if (successProbability >= 0.50f)
-				fuelFlowState = "Very Risky";
-			else if (successProbability >= 0.30f)
-				fuelFlowState = "Unstable";
-			else
-				fuelFlowState = "Very Unstable";
-            Debug.Log("GetFuelFlowStability:end:"+FuelFlowState);
+            //Debug.Log("GetFuelFlowStability:end:"+ successProbability);
             return successProbability; 
 		}
         public float GetJerkDamage() {
-            Debug.Log("Jerk: " + jerk);
-            Debug.Log("JerkAccumAmount: " + jerksqrAccumAmount + "::" + maxJerksqrAccumAmount);
-            Debug.Log("AngularJerk: " + angularJerk);
+            //Debug.Log("Jerk: " + jerk);
+            //Debug.Log("JerkAccumAmount: " + jerksqrAccumAmount + "::" + maxJerksqrAccumAmount);
+            //Debug.Log("AngularJerk: " + angularJerk);
             return jerksqrAccumAmount;
         }
     }
